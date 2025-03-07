@@ -1,5 +1,6 @@
 const express = require('express');
 const ActiveDirectory = require('activedirectory2').promiseWrapper;
+const ldap = require('ldapjs');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 
@@ -17,7 +18,7 @@ const adConfig = {
 
 const ad = new ActiveDirectory(adConfig);
 
-// Login Endpoint (unchanged, handles both NetBIOS and UPN formats)
+// Login Endpoint - using activedirectory2
 app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
   try {
@@ -46,7 +47,7 @@ app.post('/api/logout', (req, res) => {
   res.json({ success: true, message: 'Logged out successfully.' });
 });
 
-// Password Change Endpoint using ldapjs (unchanged from previous fix)
+// Password Change Endpoint using ldapjs (fixed modification format)
 app.post('/api/change-password', async (req, res) => {
   const { username, newPassword } = req.body;
   try {
@@ -64,13 +65,14 @@ app.post('/api/change-password', async (req, res) => {
     });
 
     // Prepare the DN for the user (adjust based on your AD structure)
-    const userDN = `CN=${username},OU=Users,DC=vh,DC=geleximco`; // Adjust OU if needed
+    const userDN = `CN=${username},OU=VHG,OU=Geleximco,DC=vh,DC=geleximco`; // Adjust OU if needed
 
     // Modify the user's password (unicodePwd requires UTF-16 encoding, wrapped in quotes)
     const change = new ldap.Change({
       operation: 'replace',
       modification: {
-        unicodePwd: Buffer.from(`"${newPassword}"`, 'utf16le') // UTF-16 little-endian encoding
+        type: 'unicodePwd', // Attribute name
+        values: [Buffer.from(`"${newPassword}"`, 'utf16le')] // Array of values, UTF-16 little-endian encoding
       }
     });
 
